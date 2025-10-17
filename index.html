@@ -7,9 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=Philosopher:wght@700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- Library untuk cropping -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -39,6 +43,9 @@
         .text-brand {
             color: #002D21; /* Warna teks yang sangat gelap */
         }
+        .font-philosopher {
+            font-family: 'Philosopher', sans-serif;
+        }
         
         /* --- Animasi --- */
         @keyframes fadeInUp {
@@ -51,35 +58,33 @@
                 transform: translateY(0);
             }
         }
-
-        @keyframes fadeOutUp {
-            from {
-                opacity: 1;
-                transform: translateY(0);
-            }
-            to {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-        }
-        
         .animate-entry {
-            opacity: 0; /* Mulai dalam keadaan transparan */
+            opacity: 0;
             animation: fadeInUp 0.6s ease-out forwards;
         }
 
-        .animate-exit {
-            animation: fadeOutUp 0.4s ease-in forwards;
+        /* --- Modal Editor --- */
+        #editor-modal {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        #editor-container {
+            max-width: 90vw;
+            max-height: 80vh;
+        }
+        .cropper-view-box {
+            border-radius: 12px; /* Membuat area crop berujung bulat */
+            outline: 3px solid #006A4E;
         }
 
-        .page {
-            /* Dihapus: transition: opacity 0.4s ease-in-out, visibility 0.4s; */
+        /* Membuat kisi-kisi crop lebih terlihat */
+        .cropper-dashed {
+            border-color: rgba(255, 255, 255, 0.7) !important;
+            border-width: 2px !important;
         }
-
-        /* Dihapus: .page.is-hidden karena digantikan oleh class 'hidden' dari Tailwind */
-
-        #preview-gallery {
-            transition: opacity 0.3s ease-in;
+        .cropper-center {
+             width: 8px !important;
+             height: 8px !important;
+             background-color: rgba(255, 255, 255, 0.7) !important;
         }
 
     </style>
@@ -90,9 +95,9 @@
     <div id="page1" class="page min-h-screen flex flex-col justify-center items-center text-center p-4">
         <img src="https://iili.io/KkzAuwv.png" alt="Logo" class="h-28 w-28 mb-6 animate-entry" style="animation-delay: 100ms;" border="0">
         <h2 class="text-3xl font-bold animate-entry" style="animation-delay: 200ms;">
-            Foto<span class="bg-[#006A4E] text-white rounded-lg px-3 py-1 ml-2">KTS</span>
+            Foto<span class="bg-[#006A4E] text-white rounded-lg px-4 py-1 ml-2">KTSMU</span>
         </h2>
-        <h1 class="text-5xl font-extrabold mt-2 tracking-tight animate-entry" style="animation-delay: 300ms;">Kartu Tanda Santri</h1>
+        <h1 class="text-5xl font-philosopher font-extrabold mt-2 tracking-tight animate-entry" style="animation-delay: 300ms;">Kartu Tanda Santri</h1>
         <p class="text-xl mt-3 text-gray-600 animate-entry" style="animation-delay: 400ms;">Pondok Pesantren Miftahul Ulum</p>
         <button id="getStartedBtn" class="btn mt-10 animate-entry" style="animation-delay: 500ms;">Getstarted</button>
     </div>
@@ -101,33 +106,23 @@
     <div id="page2" class="page hidden min-h-screen flex-col p-6 md:p-10">
         <header class="flex items-center space-x-4">
             <img src="https://iili.io/KkzAuwv.png" alt="Logo" class="h-14 w-14" border="0">
-            <div>
+            <div class="flex flex-col">
                 <h2 class="text-xl font-bold">
-                    Foto<span class="bg-[#006A4E] text-white rounded-md px-2 py-0.5 ml-1 text-lg">KTS</span>
+                    Foto<span class="bg-[#006A4E] text-white rounded-md px-2 py-0.5 ml-1.5 text-lg">KTSMU</span>
                 </h2>
-                <h1 class="text-2xl font-extrabold tracking-tight">Kartu Tanda Santri</h1>
-                <p class="text-md text-gray-600">Pondok Pesantren Miftahul Ulum</p>
+                <h1 class="text-2xl font-philosopher font-extrabold tracking-tight -mt-0.5">Kartu Tanda Santri</h1>
+                <p class="text-md text-gray-600 -mt-0.5">Pondok Pesantren Miftahul Ulum</p>
             </div>
         </header>
 
         <main class="flex-grow flex flex-col justify-center items-center my-8">
-            <!-- Area upload awal -->
             <div id="upload-area" class="w-full max-w-4xl text-center">
-                <div class="bg-gray-200/50 rounded-2xl p-10 flex justify-center items-center h-80">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-card-image text-gray-400" viewBox="0 0 16 16">
-                        <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
-                        <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5z"/>
-                        <path d="M10.648 7.646a.5.5 0 0 1 .577-.093l4.777 3.947V13.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-1.266l4.777-3.947a.5.5 0 0 1 .577.093z"/>
-                    </svg>
+                 <div class="bg-gray-200/50 rounded-2xl p-10 flex justify-center items-center h-80">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-card-image text-gray-400" viewBox="0 0 16 16"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5z"/><path d="M10.648 7.646a.5.5 0 0 1 .577-.093l4.777 3.947V13.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-1.266l4.777-3.947a.5.5 0 0 1 .577.093z"/></svg>
                 </div>
             </div>
-            <!-- Galeri pratinjau foto yang telah diproses -->
-            <div id="preview-gallery" class="hidden w-full max-w-6xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                <!-- Gambar yang diedit akan muncul di sini -->
-            </div>
-             <div id="processing-indicator" class="hidden mt-4 text-lg font-semibold text-gray-700">
-                <p>Memproses gambar...</p>
-            </div>
+            <div id="preview-gallery" class="hidden w-full max-w-6xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+            <div id="processing-indicator" class="hidden mt-4 text-lg font-semibold text-gray-700"><p>Memproses gambar...</p></div>
         </main>
 
         <footer class="flex justify-center items-center space-x-4">
@@ -137,9 +132,25 @@
         </footer>
     </div>
 
+    <!-- Modal untuk Editor Penyesuaian Foto -->
+    <div id="editor-modal" class="fixed inset-0 z-50 flex-col items-center justify-center hidden animate-entry">
+        <div id="editor-container" class="bg-white p-4 rounded-lg shadow-2xl flex flex-col">
+            <div class="flex-grow w-full h-full">
+                <img id="image-to-edit" class="max-w-full max-h-full">
+            </div>
+            <div class="flex justify-center items-center space-x-4 mt-4">
+                <button id="cancel-edit-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-full">Batal</button>
+                <button id="save-edit-btn" class="btn">Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         // --- State Management ---
-        let processedImages = []; // Menyimpan { name, blob }
+        let processedImages = []; // Menyimpan { name, blob, originalFile }
+        let cropper = null;
+        let currentEditingFile = null;
 
         // --- DOM Elements ---
         const page1 = document.getElementById('page1');
@@ -151,211 +162,242 @@
         const uploadArea = document.getElementById('upload-area');
         const previewGallery = document.getElementById('preview-gallery');
         const processingIndicator = document.getElementById('processing-indicator');
-
+        const editorModal = document.getElementById('editor-modal');
+        const imageToEdit = document.getElementById('image-to-edit');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const saveEditBtn = document.getElementById('save-edit-btn');
+        
         // --- Navigation ---
         getStartedBtn.addEventListener('click', () => {
-            // 1. Terapkan animasi keluar ke halaman 1
-            page1.classList.add('animate-exit');
-
-            // 2. Tunggu animasi selesai, lalu tukar halaman
-            page1.addEventListener('animationend', () => {
-                page1.classList.add('hidden'); // Sembunyikan sepenuhnya
-                
-                // Tampilkan halaman 2 dengan animasi masuk
+            page1.style.transition = 'opacity 0.4s ease-out';
+            page1.style.opacity = '0';
+            page1.addEventListener('transitionend', () => {
+                page1.classList.add('hidden');
                 page2.classList.remove('hidden');
                 page2.classList.add('flex', 'animate-entry');
-            }, { once: true }); // Pastikan event listener hanya berjalan sekali
+            }, { once: true });
         });
 
         // --- File Upload & Processing ---
         uploadBtn.addEventListener('click', () => fileInput.click());
-
         fileInput.addEventListener('change', async (event) => {
             const files = event.target.files;
             if (files.length === 0) return;
-
-            // Jangan reset UI, cukup tambahkan foto baru
             uploadArea.classList.add('hidden');
             previewGallery.classList.remove('hidden');
             processingIndicator.classList.remove('hidden');
-            downloadBtn.disabled = true; // Nonaktifkan tombol unduh selama proses
-
-            // Dapatkan jumlah gambar yang sudah ada untuk delay animasi yang benar
+            downloadBtn.disabled = true;
             const existingImageCount = processedImages.length;
             const processingPromises = Array.from(files).map((file, index) => processImage(file, existingImageCount + index));
             await Promise.all(processingPromises);
-            
             processingIndicator.classList.add('hidden');
-
-            if (processedImages.length > 0) {
-                downloadBtn.disabled = false;
-            }
-
-            // Reset input file agar bisa memilih file yang sama lagi jika diperlukan
+            if (processedImages.length > 0) downloadBtn.disabled = false;
             fileInput.value = '';
         });
 
-        /**
-         * Memproses satu file gambar: mengubah ukuran, memotong, dan membulatkan sudut.
-         * Secara dinamis menyesuaikan resolusi untuk mendapatkan ukuran file di bawah 500KB.
-         * @param {File} file - File gambar yang akan diproses.
-         * @param {number} index - Indeks file untuk delay animasi.
-         */
-        function processImage(file, index) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = async () => {
-                        try {
-                            const MAX_SIZE_BYTES = 500 * 1024; // 500 KB
-                            const targetAspectRatio = 3 / 4;
+        async function processImage(file, index, customCanvas = null) {
+            const fileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+            const imageSource = customCanvas || file;
 
-                            // Hitung parameter pemotongan (crop) sekali saja
+            const finalBlob = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = async () => {
+                    try {
+                        const MAX_SIZE_BYTES = 500 * 1024;
+                        let sourceCanvas;
+                        
+                        if (customCanvas) {
+                            sourceCanvas = customCanvas;
+                        } else {
+                            sourceCanvas = document.createElement('canvas');
+                            const ctx = sourceCanvas.getContext('2d');
+                            const targetAspectRatio = 3 / 4;
                             let sourceX = 0, sourceY = 0, sourceWidth = img.width, sourceHeight = img.height;
                             const originalAspectRatio = img.width / img.height;
 
                             if (originalAspectRatio > targetAspectRatio) {
                                 sourceWidth = img.height * targetAspectRatio;
                                 sourceX = (img.width - sourceWidth) / 2;
-                            } else if (originalAspectRatio < targetAspectRatio) {
+                            } else {
                                 sourceHeight = img.width / targetAspectRatio;
                                 sourceY = (img.height - sourceHeight) / 2;
                             }
-
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            
-                            let currentWidth = 1200;
-                            const minWidth = 150;
-                            let finalBlob = null;
-
-                            while (currentWidth >= minWidth) {
-                                const currentHeight = currentWidth / targetAspectRatio;
-                                canvas.width = currentWidth;
-                                canvas.height = currentHeight;
-
-                                const cornerRadius = currentWidth * (25 / 300);
-
-                                ctx.beginPath();
-                                ctx.moveTo(cornerRadius, 0);
-                                ctx.lineTo(canvas.width - cornerRadius, 0);
-                                ctx.arcTo(canvas.width, 0, canvas.width, cornerRadius, cornerRadius);
-                                ctx.lineTo(canvas.width, canvas.height - cornerRadius);
-                                ctx.arcTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height, cornerRadius);
-                                ctx.lineTo(cornerRadius, canvas.height);
-                                ctx.arcTo(0, canvas.height, 0, canvas.height - cornerRadius, cornerRadius);
-                                ctx.lineTo(0, cornerRadius);
-                                ctx.arcTo(0, 0, cornerRadius, 0, cornerRadius);
-                                ctx.closePath();
-                                ctx.clip();
-                                
-                                ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, currentWidth, currentHeight);
-                                
-                                const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-                                
-                                if (blob.size <= MAX_SIZE_BYTES) {
-                                    finalBlob = blob;
-                                    break;
-                                }
-                                
-                                finalBlob = blob;
-                                currentWidth -= 50;
-                            }
-                            
-                            if (finalBlob.size > MAX_SIZE_BYTES) {
-                                 console.warn(`File ${file.name} masih di atas 500KB pada resolusi terendah.`);
-                            }
-
-                            const fileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-                            processedImages.push({ name: `${fileName}.png`, blob: finalBlob });
-                            
-                            const previewUrl = URL.createObjectURL(finalBlob);
-                            const previewImgContainer = document.createElement('div');
-                            previewImgContainer.className = 'relative aspect-[3/4] bg-gray-200 rounded-lg overflow-hidden shadow-md group animate-entry';
-                            previewImgContainer.style.animationDelay = `${index * 50}ms`; // Delay animasi bertingkat
-                            previewImgContainer.dataset.filename = `${fileName}.png`;
-
-                            const previewImg = document.createElement('img');
-                            previewImg.src = previewUrl;
-                            previewImg.className = 'w-full h-full object-cover';
-                            
-                            const deleteBtn = document.createElement('button');
-                            deleteBtn.innerHTML = '&times;';
-                            deleteBtn.className = 'absolute top-1 right-1 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xl font-bold opacity-0 group-hover:opacity-100 transition-opacity';
-                            deleteBtn.dataset.filename = `${fileName}.png`;
-
-                            previewImgContainer.appendChild(previewImg);
-                            previewImgContainer.appendChild(deleteBtn);
-                            previewGallery.appendChild(previewImgContainer);
-
-                            resolve();
-                        } catch (error) {
-                            console.error("Gagal memproses gambar:", error);
-                            reject(error);
+                            sourceCanvas.width = sourceWidth;
+                            sourceCanvas.height = sourceHeight;
+                            ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight);
                         }
-                    };
-                    img.onerror = reject;
-                    img.src = e.target.result;
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        let currentWidth = 1200;
+                        let resultBlob = null;
+
+                        while (currentWidth >= 150) {
+                            const currentHeight = currentWidth / (3 / 4);
+                            canvas.width = currentWidth;
+                            canvas.height = currentHeight;
+                            const cornerRadius = currentWidth * (25 / 300);
+                            ctx.beginPath();
+                            ctx.moveTo(cornerRadius, 0);
+                            ctx.lineTo(canvas.width - cornerRadius, 0);
+                            ctx.arcTo(canvas.width, 0, canvas.width, cornerRadius, cornerRadius);
+                            ctx.lineTo(canvas.width, canvas.height - cornerRadius);
+                            ctx.arcTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height, cornerRadius);
+                            ctx.lineTo(cornerRadius, canvas.height);
+                            ctx.arcTo(0, canvas.height, 0, canvas.height - cornerRadius, cornerRadius);
+                            ctx.lineTo(0, cornerRadius);
+                            ctx.arcTo(0, 0, cornerRadius, 0, cornerRadius);
+                            ctx.closePath();
+                            ctx.clip();
+                            ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, currentWidth, currentHeight);
+                            
+                            const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+                            if (blob.size <= MAX_SIZE_BYTES) {
+                                resultBlob = blob;
+                                break;
+                            }
+                            resultBlob = blob;
+                            currentWidth -= 50;
+                        }
+                        resolve(resultBlob);
+                    } catch (error) { reject(error); }
                 };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
+                img.onerror = reject;
+                img.src = customCanvas ? customCanvas.toDataURL() : URL.createObjectURL(file);
             });
+
+            const imageName = `${fileName}.png`;
+            const existingImageIndex = processedImages.findIndex(p => p.name === imageName);
+
+            if (existingImageIndex > -1) {
+                // Perbarui gambar yang ada
+                processedImages[existingImageIndex].blob = finalBlob;
+                const existingContainer = document.querySelector(`.group[data-filename="${imageName}"]`);
+                existingContainer.querySelector('img').src = URL.createObjectURL(finalBlob);
+            } else {
+                // Tambahkan gambar baru
+                processedImages.push({ name: imageName, blob: finalBlob, originalFile: file });
+                const previewUrl = URL.createObjectURL(finalBlob);
+                const previewImgContainer = document.createElement('div');
+                previewImgContainer.className = 'relative aspect-[3/4] bg-gray-200 rounded-lg overflow-hidden shadow-md group animate-entry';
+                previewImgContainer.style.animationDelay = `${index * 50}ms`;
+                previewImgContainer.dataset.filename = imageName;
+
+                const previewImg = document.createElement('img');
+                previewImg.src = previewUrl;
+                previewImg.className = 'w-full h-full object-cover';
+                
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'absolute top-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity';
+
+                const adjustBtn = document.createElement('button');
+                adjustBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></svg>`;
+                adjustBtn.className = 'bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center';
+                adjustBtn.dataset.action = 'adjust';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.className = 'bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xl font-bold';
+                deleteBtn.dataset.action = 'delete';
+
+                btnContainer.appendChild(adjustBtn);
+                btnContainer.appendChild(deleteBtn);
+                previewImgContainer.appendChild(previewImg);
+                previewImgContainer.appendChild(btnContainer);
+                previewGallery.appendChild(previewImgContainer);
+            }
         }
 
-        // --- Delete Logic ---
+        // --- Event Listeners untuk Tombol di Galeri ---
         previewGallery.addEventListener('click', (event) => {
-            if (event.target && event.target.tagName === 'BUTTON' && event.target.dataset.filename) {
-                const filenameToDelete = event.target.dataset.filename;
-                processedImages = processedImages.filter(img => img.name !== filenameToDelete);
+            const button = event.target.closest('button');
+            if (!button) return;
+            
+            const action = button.dataset.action;
+            const container = button.closest('.group');
+            const filename = container.dataset.filename;
 
-                const elementToDelete = document.querySelector(`.group[data-filename="${filenameToDelete}"]`);
-                if (elementToDelete) {
-                    // Animasi sebelum menghapus
-                    elementToDelete.style.transition = 'opacity 0.3s, transform 0.3s';
-                    elementToDelete.style.opacity = '0';
-                    elementToDelete.style.transform = 'scale(0.9)';
-                    setTimeout(() => elementToDelete.remove(), 300);
-                }
-
+            if (action === 'delete') {
+                processedImages = processedImages.filter(img => img.name !== filename);
+                container.style.transition = 'opacity 0.3s, transform 0.3s';
+                container.style.opacity = '0';
+                container.style.transform = 'scale(0.9)';
+                setTimeout(() => container.remove(), 300);
                 if (processedImages.length === 0) {
                     downloadBtn.disabled = true;
                     uploadArea.classList.remove('hidden');
                     previewGallery.classList.add('hidden');
                 }
+            } else if (action === 'adjust') {
+                const imageToAdjust = processedImages.find(img => img.name === filename);
+                if (imageToAdjust) {
+                    openEditor(imageToAdjust);
+                }
             }
         });
 
-        // --- Download Logic ---
+        // --- Logika Editor Modal ---
+        function openEditor(imageFile) {
+            currentEditingFile = imageFile;
+            imageToEdit.src = URL.createObjectURL(imageFile.originalFile);
+            editorModal.classList.remove('hidden');
+            editorModal.classList.add('flex');
+            
+            cropper = new Cropper(imageToEdit, {
+                aspectRatio: 3 / 4,
+                viewMode: 2,
+                autoCropArea: 1,
+                movable: true,
+                zoomable: true,
+                rotatable: false,
+                scalable: false,
+            });
+        }
+        function closeEditor() {
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            currentEditingFile = null;
+            editorModal.classList.add('hidden');
+            editorModal.classList.remove('flex');
+        }
+
+        cancelEditBtn.addEventListener('click', closeEditor);
+        saveEditBtn.addEventListener('click', async () => {
+            if (!cropper || !currentEditingFile) return;
+            
+            // FIX: Simpan file yang sedang diedit ke variabel lokal sebelum editor ditutup
+            const fileToProcess = currentEditingFile.originalFile;
+            const croppedCanvas = cropper.getCroppedCanvas();
+            
+            closeEditor(); // Fungsi ini me-reset `currentEditingFile` menjadi null
+            
+            processingIndicator.classList.remove('hidden');
+            downloadBtn.disabled = true;
+
+            // Gunakan variabel lokal yang sudah disimpan agar tidak terjadi error
+            await processImage(fileToProcess, 0, croppedCanvas);
+            
+            processingIndicator.classList.add('hidden');
+            if (processedImages.length > 0) downloadBtn.disabled = false;
+        });
+
+        // --- Logika Unduh ---
         downloadBtn.addEventListener('click', async () => {
             if (processedImages.length === 0) return;
-
             if (processedImages.length === 1) {
                 saveAs(processedImages[0].blob, processedImages[0].name);
                 return;
             }
-
             downloadBtn.disabled = true;
             downloadBtn.textContent = 'Menyiapkan ZIP...';
             const zip = new JSZip();
-            processedImages.forEach(image => {
-                zip.file(image.name, image.blob);
-            });
-
-            try {
-                const zipBlob = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipBlob, 'FotoKTS_Hasil.zip');
-            } catch (error) {
-                console.error("Gagal membuat file ZIP:", error);
-                const originalText = downloadBtn.textContent;
-                downloadBtn.textContent = 'Gagal membuat ZIP!';
-                setTimeout(() => {
-                    downloadBtn.textContent = originalText;
-                }, 3000);
-            } finally {
-                downloadBtn.disabled = false;
-                downloadBtn.textContent = 'Unduh Foto';
-            }
+            processedImages.forEach(image => zip.file(image.name, image.blob));
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            saveAs(zipBlob, 'FotoKTS_Hasil.zip');
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = 'Unduh Foto';
         });
     </script>
 </body>
