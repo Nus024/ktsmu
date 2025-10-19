@@ -13,6 +13,8 @@
     <!-- Library untuk cropping -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css"/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <!-- Library untuk konversi HEIC -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
 
     <style>
         body {
@@ -60,7 +62,23 @@
         }
         .animate-entry {
             opacity: 0;
-            animation: fadeInUp 0.6s ease-out forwards;
+            animation: fadeInUp 0.4s ease-out forwards; /* Durasi animasi dipersingkat */
+        }
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: scale(0.9);
+            }
         }
 
         /* --- Modal Editor --- */
@@ -87,9 +105,22 @@
              background-color: rgba(255, 255, 255, 0.7) !important;
         }
 
+        /* --- Animasi Loading --- */
+        .loader {
+            width: 60px;
+            aspect-ratio: 4;
+            background: radial-gradient(circle closest-side,#006A4E 90%,#0000) 0/calc(100%/3) 100% space;
+            clip-path: inset(0 100% 0 0);
+            animation: l1 1s steps(4) infinite;
+        }
+        @keyframes l1 {to{clip-path: inset(0 -34% 0 0)}}
+
     </style>
 </head>
 <body class="text-brand">
+
+    <!-- Area Notifikasi -->
+    <div id="notification-area" class="fixed top-4 right-4 z-[100] w-full max-w-xs space-y-2"></div>
 
     <!-- Halaman 1: Landing Page -->
     <div id="page1" class="page min-h-screen flex flex-col justify-center items-center text-center p-4">
@@ -118,15 +149,18 @@
         <main class="flex-grow flex flex-col justify-center items-center my-8">
             <div id="upload-area" class="w-full max-w-4xl text-center">
                  <div class="bg-gray-200/50 rounded-2xl p-10 flex justify-center items-center h-80">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-card-image text-gray-400" viewBox="0 0 16 16"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5z"/><path d="M10.648 7.646a.5.5 0 0 1 .577-.093l4.777 3.947V13.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-1.266l4.777-3.947a.5.5 0 0 1 .577.093z"/></svg>
+                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-card-image text-gray-400" viewBox="0 0 16 16"><path d="M6.002 5.5a1.5 1.5 S 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM1 3.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5-.5h-13a.5.5 0 0 1-.5-.5z"/><path d="M10.648 7.646a.5.5 0 0 1 .577-.093l4.777 3.947V13.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-1.266l4.777-3.947a.5.5 0 0 1 .577.093z"/></svg>
                 </div>
             </div>
             <div id="preview-gallery" class="hidden w-full max-w-6xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
-            <div id="processing-indicator" class="hidden mt-4 text-lg font-semibold text-gray-700"><p>Memproses gambar...</p></div>
+            <div id="processing-indicator" class="hidden mt-4 flex flex-col items-center justify-center space-y-2">
+                <div class="loader"></div>
+                <p class="text-lg font-semibold text-gray-700">Memproses gambar...</p>
+            </div>
         </main>
 
-        <footer class="flex justify-center items-center space-x-4">
-            <input type="file" id="fileInput" multiple accept="image/*" class="hidden">
+        <footer class="flex justify-center items-center space-x-4 py-4">
+            <input type="file" id="fileInput" multiple accept="image/*,.heic,.heif" class="hidden">
             <button id="uploadBtn" class="btn">Upload Foto</button>
             <button id="downloadBtn" class="btn" disabled>Unduh Foto</button>
         </footer>
@@ -166,10 +200,41 @@
         const imageToEdit = document.getElementById('image-to-edit');
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
         const saveEditBtn = document.getElementById('save-edit-btn');
+        const notificationArea = document.getElementById('notification-area');
         
+        // --- Fungsi Notifikasi ---
+        function showNotification(fileName, reason) {
+            const notification = document.createElement('div');
+            notification.className = 'bg-red-500 text-white p-3 rounded-lg shadow-lg flex items-start space-x-2';
+            notification.style.animation = 'slideInRight 0.5s ease-out';
+            
+            notification.innerHTML = `
+                <div class="flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-circle-fill" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>
+                </div>
+                <div>
+                    <p class="font-bold text-sm truncate">${fileName}</p>
+                    <p class="text-xs">${reason}</p>
+                </div>
+                <button class="ml-auto flex-shrink-0 text-white opacity-70 hover:opacity-100">&times;</button>
+            `;
+            
+            notificationArea.appendChild(notification);
+
+            const closeButton = notification.querySelector('button');
+            const removeNotification = () => {
+                notification.style.animation = 'fadeOut 0.3s ease-in forwards';
+                notification.addEventListener('animationend', () => notification.remove(), { once: true });
+            };
+            
+            closeButton.onclick = removeNotification;
+            setTimeout(removeNotification, 5000); // Hapus otomatis setelah 5 detik
+        }
+
+
         // --- Navigation ---
         getStartedBtn.addEventListener('click', () => {
-            page1.style.transition = 'opacity 0.4s ease-out';
+            page1.style.transition = 'opacity 0.3s ease-out';
             page1.style.opacity = '0';
             page1.addEventListener('transitionend', () => {
                 page1.classList.add('hidden');
@@ -181,62 +246,96 @@
         // --- File Upload & Processing ---
         uploadBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', async (event) => {
-            const files = event.target.files;
+            const files = Array.from(event.target.files);
             if (files.length === 0) return;
+
             uploadArea.classList.add('hidden');
             previewGallery.classList.remove('hidden');
             processingIndicator.classList.remove('hidden');
             downloadBtn.disabled = true;
+
+            const filesToProcess = [];
+
+            for (const file of files) {
+                try {
+                    const lowerCaseName = file.name.toLowerCase();
+                    if (lowerCaseName.endsWith('.heic') || lowerCaseName.endsWith('.heif')) {
+                        processingIndicator.querySelector('p').textContent = `Mengonversi ${file.name}...`;
+                        const convertedBlob = await heic2any({ blob: file, toType: "image/png" });
+                        const convertedFile = new File([convertedBlob], file.name.replace(/\.(heic|heif)$/i, '.png'), { type: 'image/png' });
+                        filesToProcess.push(convertedFile);
+                    } else {
+                        filesToProcess.push(file);
+                    }
+                } catch (error) {
+                    const reason = "Gagal mengonversi format HEIC.";
+                    console.error(`Gagal mengonversi file: ${file.name}`, error);
+                    showNotification(file.name, reason);
+                }
+            }
+
+            processingIndicator.querySelector('p').textContent = 'Memproses gambar...';
             const existingImageCount = processedImages.length;
-            const processingPromises = Array.from(files).map((file, index) => processImage(file, existingImageCount + index));
-            await Promise.all(processingPromises);
+
+            for (let i = 0; i < filesToProcess.length; i++) {
+                const file = filesToProcess[i];
+                try {
+                    await processImage(file, existingImageCount + i);
+                } catch (error) {
+                    console.error(`Gagal memproses file: ${file.name}`, error);
+                    showNotification(file.name, error.message || "Proses gagal, file mungkin rusak.");
+                }
+            }
+            
             processingIndicator.classList.add('hidden');
-            if (processedImages.length > 0) downloadBtn.disabled = false;
+            if (processedImages.length > 0) {
+                downloadBtn.disabled = false;
+            }
             fileInput.value = '';
         });
 
         async function processImage(file, index, customCanvas = null) {
             const fileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            const imageSource = customCanvas || file;
-
+            
             const finalBlob = await new Promise((resolve, reject) => {
                 const img = new Image();
+                
                 img.onload = async () => {
                     try {
                         const MAX_SIZE_BYTES = 500 * 1024;
                         let sourceCanvas;
-                        
-                        if (customCanvas) {
-                            sourceCanvas = customCanvas;
+
+                        if (customCanvas) { 
+                            sourceCanvas = customCanvas; 
                         } else {
                             sourceCanvas = document.createElement('canvas');
                             const ctx = sourceCanvas.getContext('2d');
                             const targetAspectRatio = 3 / 4;
-                            let sourceX = 0, sourceY = 0, sourceWidth = img.width, sourceHeight = img.height;
+                            let sX = 0, sY = 0, sW = img.width, sH = img.height;
                             const originalAspectRatio = img.width / img.height;
 
                             if (originalAspectRatio > targetAspectRatio) {
-                                sourceWidth = img.height * targetAspectRatio;
-                                sourceX = (img.width - sourceWidth) / 2;
+                                sW = img.height * targetAspectRatio;
+                                sX = (img.width - sW) / 2;
                             } else {
-                                sourceHeight = img.width / targetAspectRatio;
-                                sourceY = (img.height - sourceHeight) / 2;
+                                sH = img.width / targetAspectRatio;
+                                sY = (img.height - sH) / 2;
                             }
-                            sourceCanvas.width = sourceWidth;
-                            sourceCanvas.height = sourceHeight;
-                            ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight);
+                            sourceCanvas.width = sW;
+                            sourceCanvas.height = sH;
+                            ctx.drawImage(img, sX, sY, sW, sH, 0, 0, sW, sH);
                         }
 
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        let currentWidth = 1200;
-                        let resultBlob = null;
-
-                        while (currentWidth >= 150) {
-                            const currentHeight = currentWidth / (3 / 4);
+                        const renderCanvasOptimized = async (initialWidth) => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            let currentWidth = initialWidth;
+                            
+                            const height = currentWidth / (3 / 4);
                             canvas.width = currentWidth;
-                            canvas.height = currentHeight;
+                            canvas.height = height;
                             const cornerRadius = currentWidth * (25 / 300);
+
                             ctx.beginPath();
                             ctx.moveTo(cornerRadius, 0);
                             ctx.lineTo(canvas.width - cornerRadius, 0);
@@ -249,57 +348,86 @@
                             ctx.arcTo(0, 0, cornerRadius, 0, cornerRadius);
                             ctx.closePath();
                             ctx.clip();
-                            ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, currentWidth, currentHeight);
+                            ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, currentWidth, height);
                             
-                            const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-                            if (blob.size <= MAX_SIZE_BYTES) {
-                                resultBlob = blob;
-                                break;
+                            let blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+
+                            if (blob.size > MAX_SIZE_BYTES) {
+                                currentWidth = 600; 
+                                const smallerHeight = currentWidth / (3 / 4);
+                                canvas.width = currentWidth;
+                                canvas.height = smallerHeight;
+                                const smallerRadius = currentWidth * (25/300);
+                                ctx.beginPath();
+                                ctx.moveTo(smallerRadius, 0);
+                                ctx.lineTo(canvas.width - smallerRadius, 0);
+                                ctx.arcTo(canvas.width, 0, canvas.width, smallerRadius, smallerRadius);
+                                ctx.lineTo(canvas.width, canvas.height - smallerRadius);
+                                ctx.arcTo(canvas.width, canvas.height, canvas.width - smallerRadius, canvas.height, smallerRadius);
+                                ctx.lineTo(smallerRadius, canvas.height);
+                                ctx.arcTo(0, canvas.height, 0, canvas.height - smallerRadius, smallerRadius);
+                                ctx.lineTo(0, smallerRadius);
+                                ctx.arcTo(0, 0, smallerRadius, 0, smallerRadius);
+                                ctx.closePath();
+                                ctx.clip();
+                                ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, currentWidth, smallerHeight);
+                                blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
                             }
-                            resultBlob = blob;
-                            currentWidth -= 50;
-                        }
+                            return blob;
+                        };
+
+                        const resultBlob = await renderCanvasOptimized(800); 
                         resolve(resultBlob);
-                    } catch (error) { reject(error); }
+
+                    } catch (error) { 
+                        reject(error); 
+                    }
                 };
-                img.onerror = reject;
-                img.src = customCanvas ? customCanvas.toDataURL() : URL.createObjectURL(file);
+
+                img.onerror = (err) => {
+                    reject(new Error(`Gagal memuat. Format tidak didukung/file rusak.`));
+                };
+                
+                if (customCanvas) {
+                    img.src = customCanvas.toDataURL();
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = (e) => {
+                        reject(new Error('Gagal membaca file.'));
+                    };
+                    reader.readAsDataURL(file);
+                }
             });
 
             const imageName = `${fileName}.png`;
             const existingImageIndex = processedImages.findIndex(p => p.name === imageName);
-
             if (existingImageIndex > -1) {
-                // Perbarui gambar yang ada
                 processedImages[existingImageIndex].blob = finalBlob;
                 const existingContainer = document.querySelector(`.group[data-filename="${imageName}"]`);
                 existingContainer.querySelector('img').src = URL.createObjectURL(finalBlob);
             } else {
-                // Tambahkan gambar baru
-                processedImages.push({ name: imageName, blob: finalBlob, originalFile: file });
+                processedImages.push({ name: imageName, blob: finalBlob, originalFile: file }); 
                 const previewUrl = URL.createObjectURL(finalBlob);
                 const previewImgContainer = document.createElement('div');
                 previewImgContainer.className = 'relative aspect-[3/4] bg-gray-200 rounded-lg overflow-hidden shadow-md group animate-entry';
                 previewImgContainer.style.animationDelay = `${index * 50}ms`;
                 previewImgContainer.dataset.filename = imageName;
-
                 const previewImg = document.createElement('img');
                 previewImg.src = previewUrl;
                 previewImg.className = 'w-full h-full object-cover';
-                
                 const btnContainer = document.createElement('div');
                 btnContainer.className = 'absolute top-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity';
-
                 const adjustBtn = document.createElement('button');
                 adjustBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></svg>`;
                 adjustBtn.className = 'bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center';
                 adjustBtn.dataset.action = 'adjust';
-
                 const deleteBtn = document.createElement('button');
                 deleteBtn.innerHTML = '&times;';
                 deleteBtn.className = 'bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xl font-bold';
                 deleteBtn.dataset.action = 'delete';
-
                 btnContainer.appendChild(adjustBtn);
                 btnContainer.appendChild(deleteBtn);
                 previewImgContainer.appendChild(previewImg);
@@ -307,16 +435,12 @@
                 previewGallery.appendChild(previewImgContainer);
             }
         }
-
-        // --- Event Listeners untuk Tombol di Galeri ---
         previewGallery.addEventListener('click', (event) => {
             const button = event.target.closest('button');
             if (!button) return;
-            
             const action = button.dataset.action;
             const container = button.closest('.group');
             const filename = container.dataset.filename;
-
             if (action === 'delete') {
                 processedImages = processedImages.filter(img => img.name !== filename);
                 container.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -330,66 +454,42 @@
                 }
             } else if (action === 'adjust') {
                 const imageToAdjust = processedImages.find(img => img.name === filename);
-                if (imageToAdjust) {
-                    openEditor(imageToAdjust);
-                }
+                if (imageToAdjust) { openEditor(imageToAdjust); }
             }
         });
-
-        // --- Logika Editor Modal ---
         function openEditor(imageFile) {
             currentEditingFile = imageFile;
             imageToEdit.src = URL.createObjectURL(imageFile.originalFile);
             editorModal.classList.remove('hidden');
             editorModal.classList.add('flex');
-            
-            cropper = new Cropper(imageToEdit, {
-                aspectRatio: 3 / 4,
-                viewMode: 2,
-                autoCropArea: 1,
-                movable: true,
-                zoomable: true,
-                rotatable: false,
-                scalable: false,
-            });
+            cropper = new Cropper(imageToEdit, { aspectRatio: 3 / 4, viewMode: 2, autoCropArea: 1, movable: true, zoomable: true, rotatable: false, scalable: false });
         }
         function closeEditor() {
-            if (cropper) {
-                cropper.destroy();
-                cropper = null;
-            }
+            if (cropper) { cropper.destroy(); cropper = null; }
             currentEditingFile = null;
             editorModal.classList.add('hidden');
             editorModal.classList.remove('flex');
         }
-
         cancelEditBtn.addEventListener('click', closeEditor);
         saveEditBtn.addEventListener('click', async () => {
             if (!cropper || !currentEditingFile) return;
-            
-            // FIX: Simpan file yang sedang diedit ke variabel lokal sebelum editor ditutup
             const fileToProcess = currentEditingFile.originalFile;
             const croppedCanvas = cropper.getCroppedCanvas();
-            
-            closeEditor(); // Fungsi ini me-reset `currentEditingFile` menjadi null
-            
+            closeEditor();
             processingIndicator.classList.remove('hidden');
             downloadBtn.disabled = true;
-
-            // Gunakan variabel lokal yang sudah disimpan agar tidak terjadi error
-            await processImage(fileToProcess, 0, croppedCanvas);
-            
+            try {
+                await processImage(fileToProcess, 0, croppedCanvas);
+            } catch (error) {
+                console.error("Gagal menyimpan perubahan:", error);
+                showNotification(fileToProcess.name, error.message || "Gagal menyimpan perubahan.");
+            }
             processingIndicator.classList.add('hidden');
             if (processedImages.length > 0) downloadBtn.disabled = false;
         });
-
-        // --- Logika Unduh ---
         downloadBtn.addEventListener('click', async () => {
             if (processedImages.length === 0) return;
-            if (processedImages.length === 1) {
-                saveAs(processedImages[0].blob, processedImages[0].name);
-                return;
-            }
+            if (processedImages.length === 1) { saveAs(processedImages[0].blob, processedImages[0].name); return; }
             downloadBtn.disabled = true;
             downloadBtn.textContent = 'Menyiapkan ZIP...';
             const zip = new JSZip();
@@ -402,6 +502,4 @@
     </script>
 </body>
 </html>
-
-
 
